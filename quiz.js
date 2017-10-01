@@ -51,7 +51,7 @@ exports.evaluateAnswer = function evaluateAnswer(userId, currentGuess, timeOfGue
     removeWordFromQuizList(userId, currentWord.englishWord)
     currentWord.time = timeOfGuess;
     var returnMessage = null;
-    if (currentWord.englishWord.toLowerCase() === currentGuess.toLowerCase()) {
+    if (currentWord.englishWord.toLowerCase() === currentGuess.text.toLowerCase()) {
       // TODO: If level is 5 we don't want to increase it any more, otherwise we do
       currentWord.level = currentWord.level + 1;
       returnMessage = "Correct! Here is your next word.";
