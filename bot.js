@@ -6,7 +6,13 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const request = require('request');
 const path = require('path');
+const firebase = require('./firebase.js')
+const onboarding = require('./onboarding.js');
 var messengerButton = "<html><head><title>Facebook Messenger Bot</title></head><body><h1>Facebook Messenger Bot</h1>This is a bot based on Messenger Platform QuickStart. For more details, see their <a href=\"https://developers.facebook.com/docs/messenger-platform/guides/quick-start\">docs</a>.<script src=\"https://button.glitch.me/button.js\" data-style=\"glitch\"></script><div class=\"glitchButton\" style=\"position:fixed;top:20px;right:20px;\"></div></body></html>";
+
+var translate = require('@google-cloud/translate')({
+  keyFilename: '/app/wordly-1f8b1d4adc52.json'
+});
 
 // The rest of the code implements the routes for our Express server.
 let app = express();
@@ -75,6 +81,10 @@ function receivedMessage(event) {
   var recipientID = event.recipient.id;
   var timeOfMessage = event.timestamp;
   var message = event.message;
+  if(message.text == "hey"){
+    firebase.createUser(senderID, "Korean");
+  }
+  firebase.addMessage(senderID, message.text);
 
   console.log("Received message for user %d and page %d at %d with message:", 
     senderID, recipientID, timeOfMessage);
@@ -94,7 +104,8 @@ function receivedMessage(event) {
         break;
 
       default:
-        sendTextMessage(senderID, messageText);
+        //sendTextMessage(senderID, messageText);
+        translateAndSendTextMessage(senderID, messageText)
     }
   } else if (messageAttachments) {
     sendTextMessage(senderID, "Message with attachment received");
@@ -132,6 +143,17 @@ function sendTextMessage(recipientId, messageText) {
   };
 
   callSendAPI(messageData);
+}
+
+function translateAndSendTextMessage(senderID, messageText) {
+  translate.translate(messageText, "ru")
+    .then((translatedText) => {
+      sendTextMessage(senderID, translatedText)
+    })
+    .catch((err) => {
+      console.error('ERROR:', err);
+    }
+  );
 }
 
 function sendGenericMessage(recipientId) {

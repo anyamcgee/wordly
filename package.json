@@ -22,6 +22,7 @@
     "request": "^2.72.0",
     "express": "*",
     "body-parser": "*",
-    "firebase": "^4.4.0"
+    "firebase": "^4.4.0",
+    "@google-cloud/translate": "^1.0.0"
   }
 }
