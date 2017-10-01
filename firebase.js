@@ -32,12 +32,15 @@ exports.createUser = function createUser(userId, language) {
 }
 
 exports.updateLanguage = function updateLanguage(userId, language) {
-  database.ref('users/' + userId + '/language').set(language);
-  database.ref('users/' + userId + '/beingAsked').set(false);
+  return database.ref('users/' + userId + '/language').set(language);
+}
+exports.clearLanguage = function clearLanguage(userId) {
+  console.log("clearing language")
+ return database.ref('users/' + userId + '/language').remove()
 }
 
-exports.setWasAsked = function setWasAsked(userId) {
-  database.ref('users/' + userId + '/beingAsked').set(true);
+exports.setWasAsked = function setWasAsked(userId, val) {
+  database.ref('users/' + userId + '/beingAsked').set(val);
 }
 
 exports.getUserLanguage = function getUserLanguage(userId) {
@@ -50,5 +53,11 @@ exports.getUserLanguage = function getUserLanguage(userId) {
 exports.getUser = function getUser(userId) {
   return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
     return snapshot.val();
+  });
+}
+
+exports.getUserWords = function getUserWords(userId) {
+  return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
+    return (snapshot.val() && snapshot.val().words) || false;
   });
 }

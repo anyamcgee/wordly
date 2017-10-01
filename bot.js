@@ -104,16 +104,32 @@ function askUserForLanguage(event, user) {
   
   if (user.beingAsked) {
     var userLanguage = parseLanguage(message.text)
+  
     if (!userLanguage) {
       sendTextMessage(senderID, "Sorry, we didn't recognize that language");
     } else {
       firebase.updateLanguage(senderID, userLanguage);
       sendTextMessage(senderID, "Great, you're all set to learn " + message.text);
+      firebase.setWasAsked(senderID, false);
     }
   } else {
     sendTextMessage(senderID, "What language would you like to learn?");
-    firebase.setWasAsked(senderID);
+    firebase.setWasAsked(senderID, true);
   }
+}
+
+function receivedWord(senderID, messageText, language) {
+  translateAndSendTextMessage(senderID, messageText, language);
+}
+
+function beginReview(user) {
+  firebase.getUserWords(user).then(function(words) {
+    var string = "Here are your searched words: "
+    words.forEach(function(word) {
+      string = string.concat(word.concat(", "));
+    })
+    sendTextMessage(user, string);
+  });
 }
 
 function respondToMessage(event, user) {
@@ -121,7 +137,6 @@ function respondToMessage(event, user) {
   var recipientID = event.recipient.id;
   var timeOfMessage = event.timestamp;
   var message = event.message;
-
 
   firebase.addMessage(senderID, message.text);
 
@@ -131,22 +146,21 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
-  var messageAttachments = message.attachments;
-
-  if (messageText) {
-    // If we receive a text message, check to see if it matches a keyword
-    // and send back the template example. Otherwise, just echo the text we received.
-    switch (messageText) {
-      case 'generic':
-        sendGenericMessage(senderID);
-        break;
-
-      default:
-        translateAndSendTextMessage(senderID, messageText, user.language);
-    }
-  } else if (messageAttachments) {
-    sendTextMessage(senderID, "Message with attachment received");
-    }
+  
+  switch (messageText.toLowerCase()) {
+    case "review":
+      beginReview();
+      break;
+    case "switch language":
+      console.log("asdfasdf");
+      firebase.clearLanguage(senderID).then(() => {
+        askUserForLanguage(event, user);
+      })
+      break;
+    default:
+      receivedWord(senderID, messageText, user.language);
+      break;
+  }
 }
 
 function receivedPostback(event) {
