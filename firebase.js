@@ -21,7 +21,34 @@ exports.addMessage = function addMessage(userId, message){
 
 exports.createUser = function createUser(userId, language) {
   console.log("hittin dat firebase")
-  database.ref('users/' + userId).set({
-    language: language
+  var ref = database.ref('users/' + userId);
+  return ref.set({
+    beingAsked: false
+  }).then(() => {
+    return ref.once('value');
+  }).then((snapshot) =>{
+      return Promise.resolve(snapshot.val())
+  });
+}
+
+exports.updateLanguage = function updateLanguage(userId, language) {
+  database.ref('users/' + userId + '/language').set(language);
+  database.ref('users/' + userId + '/beingAsked').set(false);
+}
+
+exports.setWasAsked = function setWasAsked(userId) {
+  database.ref('users/' + userId + '/beingAsked').set(true);
+}
+
+exports.getUserLanguage = function getUserLanguage(userId) {
+  console.log("hittin dat firebase")
+  return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
+    return (snapshot.val() && snapshot.val().language) || false;
+  });
+}
+
+exports.getUser = function getUser(userId) {
+  return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
+    return snapshot.val();
   });
 }
