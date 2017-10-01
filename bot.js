@@ -118,16 +118,27 @@ function askUserForLanguage(event, user) {
   }
 }
 
-function receivedWord(senderID, messageText, language) {
+function receivedWord(senderID, messageText, language, timeOfMessage) {
+  saveWord(senderID, messageText, language, timeOfMessage);
   translateAndSendTextMessage(senderID, messageText, language);
+}
+
+function saveWord(senderID, word, language, timeOfMessage) {
+  var entry = {};
+  entry.language = language;
+  entry.time = timeOfMessage;
+  entry.level = 1;
+  
+  firebase.addWord(senderID, word, entry);
 }
 
 function beginReview(user) {
   firebase.getUserWords(user).then(function(words) {
-    var string = "Here are your searched words: "
-    words.forEach(function(word) {
-      string = string.concat(word.concat(", "));
-    })
+    console.log(words);
+    var string = "Here are your searched words: \n\n"
+    for (var key in words) {
+      string = string + key + " : " + words[key].translation + "\n";
+    }
     sendTextMessage(user, string);
   });
 }
@@ -138,8 +149,6 @@ function respondToMessage(event, user) {
   var timeOfMessage = event.timestamp;
   var message = event.message;
 
-  firebase.addMessage(senderID, message.text);
-
   console.log("Received message for user %d and page %d at %d with message:", senderID, recipientID, timeOfMessage);
   console.log(JSON.stringify(message));
 
@@ -149,16 +158,15 @@ function respondToMessage(event, user) {
   
   switch (messageText.toLowerCase()) {
     case "review":
-      beginReview();
+      beginReview(senderID);
       break;
     case "switch language":
-      console.log("asdfasdf");
       firebase.clearLanguage(senderID).then(() => {
         askUserForLanguage(event, user);
       })
       break;
     default:
-      receivedWord(senderID, messageText, user.language);
+      receivedWord(senderID, messageText, user.language, timeOfMessage);
       break;
   }
 }
@@ -199,6 +207,7 @@ function sendTextMessage(recipientId, messageText) {
 function translateAndSendTextMessage(senderID, messageText, targetLanguage) {
   translate.translate(messageText, targetLanguage)
     .then((translatedText) => {
+      firebase.addTranslationForWord(senderID, translatedText[0], messageText);
       sendTextMessage(senderID, translatedText[0])
     })
     .catch((err) => {
