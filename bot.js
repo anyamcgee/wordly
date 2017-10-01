@@ -103,7 +103,8 @@ function help(userId) {
   var text = "Here are some commands you can use: \n\n"
   text = text + "list - list all of the words you've searched so far \n"
   text = text + "review - start a quiz with the words you need to review \n"
-  text = text + "switch language - switch the language you want to learn\n\n"
+  text = text + "switch language - switch the language you want to learn\n"
+  text = text + "set time to HH:mm - sets your quiz time to hour HH and minute mm in 24 hour time\n\n"
   text = text + "To get a word definition in your chosen language, just send me the word"
   sendTextMessage(userId, text);
 }
@@ -203,6 +204,9 @@ function respondToMessage(event, user) {
       break;
     case "review":
       quiz.beginQuiz(senderID);
+      break;
+    case "help":
+      help(senderID);
       break;
     default:
       receivedWord(senderID, messageText, user.language, timeOfMessage);
