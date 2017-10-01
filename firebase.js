@@ -14,10 +14,13 @@ var exports = module.exports
 firebase.initializeApp(config);
 var database = firebase.database();
 
-exports.addMessage = function addMessage(userId, message){
-   var newItem = database.ref('users/' + userId + "/words").push();
-    newItem.set(message)
+exports.addWord = function addMessage(userId, word, entry){
+   var newItem = database.ref('users/' + userId + "/words/" + word).set(entry);
 }
+
+exports.addTranslationForWord = function addTranslationForWord(userId, translation, word) {
+  database.ref('users/' + userId + "/words/" + word + "/translation").set(translation);
+};
 
 exports.createUser = function createUser(userId, language) {
   console.log("hittin dat firebase")
