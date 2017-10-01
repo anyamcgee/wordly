@@ -8,10 +8,11 @@ const request = require('request');
 const path = require('path');
 const firebase = require('./firebase.js')
 const onboarding = require('./onboarding.js');
+const languages = require('./languages.js')
 var messengerButton = "<html><head><title>Facebook Messenger Bot</title></head><body><h1>Facebook Messenger Bot</h1>This is a bot based on Messenger Platform QuickStart. For more details, see their <a href=\"https://developers.facebook.com/docs/messenger-platform/guides/quick-start\">docs</a>.<script src=\"https://button.glitch.me/button.js\" data-style=\"glitch\"></script><div class=\"glitchButton\" style=\"position:fixed;top:20px;right:20px;\"></div></body></html>";
 
 var translate = require('@google-cloud/translate')({
-  keyFilename: '/app/wordly-1f8b1d4adc52.json'
+  keyFilename: 'app/keyfile.json'
 });
 
 // The rest of the code implements the routes for our Express server.
@@ -75,19 +76,56 @@ app.post('/webhook', function (req, res) {
   }
 });
 
-// Incoming events handling
 function receivedMessage(event) {
+  var senderID = event.sender.id;
+  
+  firebase.getUser(senderID).then((user) => {
+    
+    if (!user) {
+      createNewUser(event, senderID);
+    } else if (!user.language) {
+      askUserForLanguage(event, user)
+    } else {
+      respondToMessage(event, user);
+    }
+    
+  });
+}
+
+function createNewUser(event, senderId) {
+  firebase.createUser(senderId).then((user) => {
+    askUserForLanguage(event, user);
+  }); 
+}
+
+function askUserForLanguage(event, user) {
+  var message = event.message;
+  var senderID = event.sender.id;
+  
+  if (user.beingAsked) {
+    var userLanguage = parseLanguage(message.text)
+    if (!userLanguage) {
+      sendTextMessage(senderID, "Sorry, we didn't recognize that language");
+    } else {
+      firebase.updateLanguage(senderID, userLanguage);
+      sendTextMessage(senderID, "Great, you're all set to learn " + message.text);
+    }
+  } else {
+    sendTextMessage(senderID, "What language would you like to learn?");
+    firebase.setWasAsked(senderID);
+  }
+}
+
+function respondToMessage(event, user) {
   var senderID = event.sender.id;
   var recipientID = event.recipient.id;
   var timeOfMessage = event.timestamp;
   var message = event.message;
-  if(message.text == "hey"){
-    firebase.createUser(senderID, "Korean");
-  }
+
+
   firebase.addMessage(senderID, message.text);
 
-  console.log("Received message for user %d and page %d at %d with message:", 
-    senderID, recipientID, timeOfMessage);
+  console.log("Received message for user %d and page %d at %d with message:", senderID, recipientID, timeOfMessage);
   console.log(JSON.stringify(message));
 
   var messageId = message.mid;
@@ -104,12 +142,11 @@ function receivedMessage(event) {
         break;
 
       default:
-        //sendTextMessage(senderID, messageText);
-        translateAndSendTextMessage(senderID, messageText)
+        translateAndSendTextMessage(senderID, messageText, user.language);
     }
   } else if (messageAttachments) {
     sendTextMessage(senderID, "Message with attachment received");
-  }
+    }
 }
 
 function receivedPostback(event) {
@@ -145,15 +182,26 @@ function sendTextMessage(recipientId, messageText) {
   callSendAPI(messageData);
 }
 
-function translateAndSendTextMessage(senderID, messageText) {
-  translate.translate(messageText, "ru")
+function translateAndSendTextMessage(senderID, messageText, targetLanguage) {
+  translate.translate(messageText, targetLanguage)
     .then((translatedText) => {
-      sendTextMessage(senderID, translatedText)
+      sendTextMessage(senderID, translatedText[0])
     })
     .catch((err) => {
       console.error('ERROR:', err);
     }
   );
+}
+
+function parseLanguage(inputtedLanguage) {
+  for (var i = 0; i < languages.length; i++){
+    if(inputtedLanguage.toLowerCase().includes(languages[i].name.toLowerCase())) {
+       return languages[i].language
+    }
+  }
+  
+  return false;
+
 }
 
 function sendGenericMessage(recipientId) {
