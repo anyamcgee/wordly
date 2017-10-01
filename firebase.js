@@ -53,6 +53,20 @@ exports.getUserLanguage = function getUserLanguage(userId) {
   });
 }
 
+exports.setQuizTime = function setQuizTime(userId, hour, minute) {
+  return database.ref('jobs/' + userId).set({
+    hour: hour,
+    minute: minute 
+  });
+}
+
+exports.getAllJobs = function getAllJobs() {
+  return firebase.database().ref('/jobs/').once('value')
+    .then((snapshot) =>{
+      return Promise.resolve(snapshot.val())
+  });
+}
+
 exports.getUser = function getUser(userId) {
   return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
     return snapshot.val();
@@ -64,3 +78,32 @@ exports.getUserWords = function getUserWords(userId) {
     return (snapshot.val() && snapshot.val().words) || false;
   });
 }
+
+exports.beginUserQuiz = function beginUserQuiz(userId) {
+  database.ref('users/' + userId + '/currentQuiz/active').set(true);
+}
+
+exports.endUserQuiz = function endUserQuiz(userId) {
+  return database.ref('users/' + userId + '/currentQuiz').remove()
+}
+
+exports.updateUserWord = function updateUserWord(userId, word, updatedWord) {
+  var newItem = database.ref('users/' + userId + "/words/" + word).set(updatedWord);
+}
+
+exports.updateUserQuizItems = function updateUserQuizItems(userId, quizItems) {
+  return database.ref('users/' + userId + "/currentQuiz/currentWordList").set(quizItems);
+}
+
+exports.getCurrentQuizWord = function getCurrentQuizWord(userId) {
+  return firebase.database().ref('/users/' + userId  + "/currentQuiz/currentWordList").once('value').then(function(snapshot) {
+    return (snapshot.val() && snapshot.val()[0]) || false;
+  });
+}
+
+exports.getCurrentQuizWords = function getCurrentQuizWords(userId) {
+  return firebase.database().ref('/users/' + userId  + "/currentQuiz/currentWordList").once('value').then(function(snapshot) {
+    return (snapshot.val()) || false;
+  });
+}
+

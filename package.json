@@ -23,6 +23,9 @@
     "express": "*",
     "body-parser": "*",
     "firebase": "^4.4.0",
-    "@google-cloud/translate": "^1.0.0"
+    "@google-cloud/translate": "^1.0.0",
+    "node-schedule": "^1.2.5",
+    "moment": "^2.18.1",
+    "moment-timezone": "^0.5.13"
   }
 }
