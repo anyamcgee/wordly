@@ -6,9 +6,12 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const request = require('request');
 const path = require('path');
+var moment = require('moment-timezone');
 const firebase = require('./firebase.js')
+const timer = require('./timer.js')
 const onboarding = require('./onboarding.js');
 const languages = require('./languages.js')
+const quiz = require('./quiz.js')
 var messengerButton = "<html><head><title>Facebook Messenger Bot</title></head><body><h1>Facebook Messenger Bot</h1>This is a bot based on Messenger Platform QuickStart. For more details, see their <a href=\"https://developers.facebook.com/docs/messenger-platform/guides/quick-start\">docs</a>.<script src=\"https://button.glitch.me/button.js\" data-style=\"glitch\"></script><div class=\"glitchButton\" style=\"position:fixed;top:20px;right:20px;\"></div></body></html>";
 
 var translate = require('@google-cloud/translate')({
@@ -17,6 +20,8 @@ var translate = require('@google-cloud/translate')({
 
 // The rest of the code implements the routes for our Express server.
 let app = express();
+app.use('/static', express.static(path.join(__dirname, 'public')))
+
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
@@ -85,11 +90,28 @@ function receivedMessage(event) {
       createNewUser(event, senderID);
     } else if (!user.language) {
       askUserForLanguage(event, user)
+    } else if (user.currentQuiz && user.currentQuiz.active) {
+      checkAnswer(senderID, event);
     } else {
       respondToMessage(event, user);
     }
     
   });
+}
+
+function help(userId) {
+  var text = "Here are some commands you can use: \n\n"
+  text = text + "list - list all of the words you've searched so far \n"
+  text = text + "review - start a quiz with the words you need to review \n"
+  text = text + "switch language - switch the language you want to learn\n\n"
+  text = text + "To get a word definition in your chosen language, just send me the word"
+  sendTextMessage(userId, text);
+}
+
+function checkAnswer(userId, event) {
+  var guess = event.message;
+  var timeOfGuess = event.timestamp;
+  quiz.evaluateAnswer(userId, guess, timeOfGuess);
 }
 
 function createNewUser(event, senderId) {
@@ -132,7 +154,7 @@ function saveWord(senderID, word, language, timeOfMessage) {
   firebase.addWord(senderID, word, entry);
 }
 
-function beginReview(user) {
+function listWords(user) {
   firebase.getUserWords(user).then(function(words) {
     console.log(words);
     var string = "Here are your searched words: \n\n"
@@ -141,6 +163,18 @@ function beginReview(user) {
     }
     sendTextMessage(user, string);
   });
+}
+
+function parseAndSetQuizTime(userId, timeString){
+   var n = timeString.split(" ");
+  var time = moment.tz(n[n.length - 1], "HH:mm", "America/Los_Angeles");
+  if (time.isValid()){
+      sendTextMessage(userId, "Setting time to " + time.hour()+":"+ time.minute()) 
+      time = time.local();
+      timer.scheduleQuiz(userId, time.hour(), time.minute()) 
+  } else {
+      sendTextMessage(userId, "Not valid time format, use HH:mm") 
+  }
 }
 
 function respondToMessage(event, user) {
@@ -155,19 +189,25 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
-  
+  if(messageText.toLowerCase().replace(/\s+/, "").includes("settime")){
+    parseAndSetQuizTime(senderID, messageText)
+  } else {
   switch (messageText.toLowerCase()) {
-    case "review":
-      beginReview(senderID);
+    case "list":
+      listWords(senderID);
       break;
     case "switch language":
       firebase.clearLanguage(senderID).then(() => {
         askUserForLanguage(event, user);
       })
       break;
+    case "review":
+      quiz.beginQuiz(senderID);
+      break;
     default:
       receivedWord(senderID, messageText, user.language, timeOfMessage);
       break;
+  }
   }
 }
 
