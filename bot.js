@@ -13,21 +13,24 @@ const onboarding = require('./onboarding.js');
 const languages = require('./languages.js')
 const quiz = require('./quiz.js')
 var messengerButton = "<html><head><title>Facebook Messenger Bot</title></head><body><h1>Facebook Messenger Bot</h1>This is a bot based on Messenger Platform QuickStart. For more details, see their <a href=\"https://developers.facebook.com/docs/messenger-platform/guides/quick-start\">docs</a>.<script src=\"https://button.glitch.me/button.js\" data-style=\"glitch\"></script><div class=\"glitchButton\" style=\"position:fixed;top:20px;right:20px;\"></div></body></html>";
-var translate = require('@google-cloud/translate')({credentials: {type: process.env.type,
-  project_id: process.env.project_id,
-  private_key_id: process.env.private_key_id,
-  private_key: process.env.private_key.replace(/\\n/g, '\n'),
-  client_email: process.env.client_email,
-  client_id: process.env.client_id,
-  auth_uri: process.env.auth_uri,
-  token_uri: process.env.token_uri,
-  auth_provider_x509_cert_url: process.env.auth_provider_x509_cert_url,
-  client_x509_cert_url: process.env.client_x509_cert_url }});
+var translate = require('@google-cloud/translate')(
+  {
+    credentials: {
+     type: process.env.type, 
+     project_id: process.env.project_id,
+     private_key_id: process.env.private_key_id,
+     private_key: process.env.private_key.replace(/\\n/g, '\n'),
+     client_email: process.env.client_email,
+     client_id: process.env.client_id,
+     auth_uri: process.env.auth_uri,
+     token_uri: process.env.token_uri,
+     auth_provider_x509_cert_url: process.env.auth_provider_x509_cert_url,
+     client_x509_cert_url: process.env.client_x509_cert_url }});
 
 // The rest of the code implements the routes for our Express server.
 let app = express();
 app.use('/static', express.static(path.join(__dirname, 'public')))
-
+exports = module.exports = {};
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
@@ -106,13 +109,17 @@ function receivedMessage(event) {
 }
 
 function help(userId) {
-  var text = "Here are some commands you can use: \n\n"
-  text = text + "list - list all of the words you've searched so far \n"
-  text = text + "review - start a quiz with the words you need to review \n"
-  text = text + "switch language - switch the language you want to learn\n"
-  text = text + "set time to HH:mm - sets your quiz time to hour HH and minute mm in 24 hour time\n\n"
-  text = text + "To get a word definition in your chosen language, just send me the word"
-  sendTextMessage(userId, text);
+  firebase.getUserLanguage(userId).then ((userLanguage) => {
+    var text = ""
+    text = text + "Supported commands: \n"
+    text = text + "\n"
+    text = text + "/list: Display a list all of the words you've searched so far. \n"
+    text = text + "/review: Start a quiz with the words which are due for review. \n"
+    text = text + "/language: Switch the language you want to learn. \n"
+    text = text + "/reminder HH:mm: Set your quiz reminder time to hour HH and minute mm in 24 hour format.\n\n"
+    sendTextMessage(userId, text);
+  })
+  
 }
 
 function checkAnswer(userId, event) {
@@ -123,11 +130,26 @@ function checkAnswer(userId, event) {
 
 function createNewUser(event, senderId) {
   firebase.createUser(senderId).then((user) => {
-    askUserForLanguage(event, user);
+    askUserForLanguage(event, user, getIntroMessage());
   }); 
 }
 
-function askUserForLanguage(event, user) {
+// TODO: There really is no reason for this to be a function lol move it to variable
+function getIntroMessage() {
+  var text = ""
+  text = text + "Hello and welcome to Wordly! 🎉"
+  text = text + "\n"
+  text = text + "\n"
+  text = text + "Wordly is your personal dictionary, using spaced repetition to drill words into your long-term memory. "
+  text = text + "I will save the words you search and help you learn them. "
+  text = text + "So sit back (or stand up, I can't control you) and get ready to learn! "
+  text = text + "\n"
+  text = text + "\n"
+  text = text + 'If you ever get stuck or confused, type "/help" for a list of supported commands.'
+  return text;
+}
+
+function askUserForLanguage(event, user, introMessage) {
   var message = event.message;
   var senderID = event.sender.id;
   
@@ -135,30 +157,59 @@ function askUserForLanguage(event, user) {
     var userLanguage = parseLanguage(message.text)
   
     if (!userLanguage) {
-      sendTextMessage(senderID, "Sorry, we didn't recognize that language");
+      sendTextMessage(senderID, "Are you sure that's a real language? 🤔\n\nPlease type the language you want to learn again.");
     } else {
       firebase.updateLanguage(senderID, userLanguage);
-      sendTextMessage(senderID, "Great, you're all set to learn " + message.text);
+      var text = "Great, you're all set to learn " + message.text + "!\n\n";
+      text = text + "Send me a word in English and I will translate it for you in " + message.text + "."
+      sendTextMessage(senderID, text)    
       firebase.setWasAsked(senderID, false);
     }
   } else {
-    sendTextMessage(senderID, "What language would you like to learn?");
+    var text = ""
+    if (introMessage !== undefined) {
+      text = text + introMessage + "\n\n"
+    }
+    text = text + "What language would you like to learn?"
+    sendTextMessage(senderID, text);
     firebase.setWasAsked(senderID, true);
   }
 }
 
+// English -> User_Lang translation
 function receivedWord(senderID, messageText, language, timeOfMessage) {
-  saveWord(senderID, messageText, language, timeOfMessage);
-  translateAndSendTextMessage(senderID, messageText, language);
+  // Ask Translate for the language of the inputted text
+  var wordLanguage = translate.detect(messageText).then((messageLanguage) => {
+    messageLanguage = messageLanguage[0].language;
+    console.log(messageLanguage);
+    // if (messageLanguage === language) {
+    //   // Word is in user language, return English translation
+    //   translateAndSendTextMessage(senderID, messageText, "en").then((englishWord) => {
+    //     console.log("english word is " + englishWord);
+    //     saveWord(senderID, englishWord, messageText, language, timeOfMessage);
+    //   });
+    // } else {
+    //   // Word is in English, return user language translation
+    //   translateAndSendTextMessage(senderID, messageText, language).then((otherLanguageWord) => {
+    //     console.log("other language word is " + otherLanguageWord);
+    //     saveWord(senderID, messageText, otherLanguageWord, language, timeOfMessage);
+    //   });
+    // }
+    translateAndSendTextMessage(senderID, messageText, language).then((otherLanguageWord) => {
+      saveWord(senderID, messageText, otherLanguageWord, language, timeOfMessage);
+    });
+  });
 }
 
-function saveWord(senderID, word, language, timeOfMessage) {
+function saveWord(senderID, word, translation, language, timeOfMessage) {
   var entry = {};
   entry.language = language;
   entry.time = timeOfMessage;
   entry.level = 1;
+  entry.translation = translation;
   
   firebase.addWord(senderID, word, entry);
+  //firebase.addTranslationForWord(senderID, translation, word);
 }
 
 function listWords(user) {
@@ -176,7 +227,7 @@ function parseAndSetQuizTime(userId, timeString){
    var n = timeString.split(" ");
   var time = moment.tz(n[n.length - 1], "HH:mm", "America/Los_Angeles");
   if (time.isValid()){
-      sendTextMessage(userId, "Setting time to " + time.hour()+":"+ time.minute()) 
+      sendTextMessage(userId, "Your quiz reminder time has been set to " + time.hour()+":"+ time.minute()) + ".";
       time = time.local();
       timer.scheduleQuiz(userId, time.hour(), time.minute()) 
   } else {
@@ -196,28 +247,28 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
-  if(messageText.toLowerCase().replace(/\s+/, "").includes("settime")){
+  if(messageText.toLowerCase().replace(/\s+/, "").includes("/reminder")){
     parseAndSetQuizTime(senderID, messageText)
   } else {
-  switch (messageText.toLowerCase()) {
-    case "list":
-      listWords(senderID);
-      break;
-    case "switch language":
-      firebase.clearLanguage(senderID).then(() => {
-        askUserForLanguage(event, user);
-      })
-      break;
-    case "review":
-      quiz.beginQuiz(senderID);
-      break;
-    case "help":
-      help(senderID);
-      break;
-    default:
-      receivedWord(senderID, messageText, user.language, timeOfMessage);
-      break;
-  }
+    switch (messageText.toLowerCase()) {
+      case "/list":
+        listWords(senderID);
+        break;
+      case "/language":
+        firebase.clearLanguage(senderID).then(() => {
+          askUserForLanguage(event, user);
+        })
+        break;
+      case "/review":
+        quiz.beginQuiz(senderID);
+        break;
+      case "/help":
+        help(senderID);
+        break;
+      default:
+        receivedWord(senderID, messageText, user.language, timeOfMessage);
+        break;
+    }
   }
 }
 
@@ -251,14 +302,18 @@ function sendTextMessage(recipientId, messageText) {
     }
   };
 
-  callSendAPI(messageData);
+  return callSendAPI(messageData);
 }
 
+// TODO: Fix for cases like chat where it's a different word in different languages
 function translateAndSendTextMessage(senderID, messageText, targetLanguage) {
-  translate.translate(messageText, targetLanguage)
+  return translate.translate(messageText, targetLanguage)
     .then((translatedText) => {
-      firebase.addTranslationForWord(senderID, translatedText[0], messageText);
-      sendTextMessage(senderID, translatedText[0])
+      // TODO: Hack to make the DB not break by taking out all the dots in the returned string. Should probably fix at some point
+      translatedText = translatedText[0].split('.').join("");
+      console.log("translateAndSendTextMessage: " + translatedText);
+      sendTextMessage(senderID, translatedText);
+      return translatedText;
     })
     .catch((err) => {
       console.error('ERROR:', err);
@@ -270,6 +325,17 @@ function parseLanguage(inputtedLanguage) {
   for (var i = 0; i < languages.length; i++){
     if(inputtedLanguage.toLowerCase().includes(languages[i].name.toLowerCase())) {
        return languages[i].language
+    }
+  }
+  
+  return false;
+
+}
+
+function parseLanguageCode(inputtedLanguageCode) {
+  for (var i = 0; i < languages.length; i++){
+    if(inputtedLanguageCode.toLowerCase().includes(languages[i].language.toLowerCase())) {
+       return languages[i].name
     }
   }
   
@@ -345,6 +411,41 @@ function callSendAPI(messageData) {
     }
   });  
 }
+
+// POST with promise 
+// function callSendAPI(messageData) {
+//   var options = {
+//     uri: 'https://graph.facebook.com/v2.6/me/messages',
+//     qs: { access_token: process.env.PAGE_ACCESS_TOKEN },
+//     method: 'POST',
+//     json: messageData
+//   }
+//   rp(options).then(function (body) {
+//     var recipientId = body.recipient_id;
+//     var messageId = body.message_id;
+
+//     console.log("Successfully sent generic message with id %s to recipient %s", 
+//         messageId, recipientId);
+//   }).catch(function(error) {
+//     console.error("Unable to send message.");
+//     console.error(error);
+//   });  
+// }
+
+// function callGetAPI(userId) {
+//   var options = {
+//     uri: 'https://graph.facebook.com/v2.6/' + userId,
+//     qs: { access_token: process.env.PAGE_ACCESS_TOKEN },
+//     method: 'GET',
+//   }
+//   return rp(options).then(function (body) {
+//     return body;
+//   }).catch(function (error) {
+//     console.error("Unable to send message.");
+//     console.error(error);
+//     return null;
+//   });
+// }
 
 // Set Express to listen out for HTTP requests
 var server = app.listen(process.env.PORT || 3000, function () {

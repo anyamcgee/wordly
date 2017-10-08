@@ -20,6 +20,7 @@
   "homepage": "https://developers.facebook.com/docs/messenger-platform/guides/quick-start",
   "dependencies": {
     "request": "^2.72.0",
+    "request-promise-native": "^1.0.5",
     "express": "*",
     "body-parser": "*",
     "firebase": "^4.4.0",

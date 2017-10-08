@@ -1,4 +1,5 @@
 const request = require('request');
+const rp = require('request-promise-native'); 
 
 //////////////////////////
 // Sending helpers
@@ -85,4 +86,26 @@ function callSendAPI(messageData) {
   });  
 }
 
-module.exports = {callSendAPI: callSendAPI, sendGenericMessage: sendGenericMessage, sendTextMessage:sendTextMessage}
+function callGetAPI(userId) {
+  return new Promise(function (fulfill, reject) {
+    var options = {
+      uri: 'https://graph.facebook.com/v2.6/' + userId,
+      qs: { access_token: process.env.PAGE_ACCESS_TOKEN },
+      method: 'GET',
+    }
+    rp(options).then(function (body) {
+      fulfill(body);
+    }).catch(function (error) {
+      console.error("Unable to send message.");
+      console.error(error);
+      reject(error);
+    });
+  });
+}
+
+module.exports = {
+  callSendAPI: callSendAPI, 
+  sendGenericMessage: sendGenericMessage, 
+  sendTextMessage: sendTextMessage,
+  callGetAPI: callGetAPI
+}

@@ -13,6 +13,22 @@ function getTimeDifference(date) {
   return 5259486; // for testing purposes: so we actually have some words to review lol
 }
 
+exports.getDueWords = function getDueWords(userId) {
+  return new Promise(function(fulfill, reject) {
+    firebase.getUserWords(userId).then(function(words) {
+      var wordsToQuiz = [];
+      for (var key in words) {
+        if (getTimeDifference(words[key].time) >= LEVEL_TO_TIME[words[key].level]) {
+          words[key].englishWord = key;
+          wordsToQuiz.push(words[key]);
+        };
+      }
+      fulfill(wordsToQuiz);
+    });
+  });
+  
+}
+
 function findWords(userId) {
   firebase.getUserWords(userId).then(function(words) {
     var wordsToQuiz = [];
