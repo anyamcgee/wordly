@@ -2,6 +2,7 @@ const firebase = require('./firebase.js')
 
 var schedule = require('node-schedule');
 var send = require('./sendingHelpers.js');
+var bot = require('./bot.js');
 var quiz = require('./quiz.js')
 var jobMap = {}
 
@@ -26,9 +27,22 @@ function scheduleQuizJob(userId, hour, minute){
   if(userId in jobMap){
     jobMap[userId].cancel()
   }
-  jobMap[userId] = schedule.scheduleJob(rule,() => {
-    send.sendTextMessage(userId, "Hey, it's time for your daily quiz!");
-    quiz.beginQuiz(userId);
-    console.log('schedulingJob');
-});
+  send.callGetAPI(userId).then((facebookUser) => {
+    facebookUser = JSON.parse(facebookUser);
+    var name = facebookUser["first_name"]
+    var dueWords = quiz.getDueWords(userId).then((dueWords) => {
+      var text = "Hey " + name + ", remember what " + dueWords[0].translation + " means? Type /review to review this word";
+      if (dueWords.length > 1) {
+        text = text + " and " + String(dueWords.length-1) + " more"    
+      }
+      text = text + "! ✍️"
+      console.log(text)
+      send.sendTextMessage(userId, text);
+    })
+  });
+
+  // jobMap[userId] = schedule.scheduleJob(rule,() => {
+  //   quiz.beginQuiz(userId);
+  //   console.log('schedulingJob');
+  // })
 }
