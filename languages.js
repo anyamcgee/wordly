@@ -1,4 +1,4 @@
-module.exports = [
+var array = [
       {
         "language": "af",
         "name": "Afrikaans"
@@ -416,4 +416,10 @@ module.exports = [
         "name": "Zulu"
       }
     ]
+var map = {}
+array.forEach((value) => {map[value.name] = value.language})
+var reverseMap = {}
+
+array.forEach((value) => {reverseMap[value.language] = value.name})
  
+module.exports = {array: array, map: map, reverseMap : reverseMap}

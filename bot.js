@@ -107,17 +107,19 @@ function receivedMessage(event) {
     
   });
 }
+var helpText = ""
+    helpText += "Supported commands: \n"
+    helpText += "\n"
+    helpText += "/list: Display a list all of the words you've searched so far. \n"
+    helpText += "/review: Start a quiz with the words which are due for review. \n"
+    helpText +=  "/language: Switch the language you want to learn. \n"
+    helpText += "/reminder HH:mm: Set your quiz reminder time to hour HH and minute mm in 24 hour format.\n"
+    helpText +=  "/stop: Stop sending reminders \n\n"
+
 
 function help(userId) {
   firebase.getUserLanguage(userId).then ((userLanguage) => {
-    var text = ""
-    text = text + "Supported commands: \n"
-    text = text + "\n"
-    text = text + "/list: Display a list all of the words you've searched so far. \n"
-    text = text + "/review: Start a quiz with the words which are due for review. \n"
-    text = text + "/language: Switch the language you want to learn. \n"
-    text = text + "/reminder HH:mm: Set your quiz reminder time to hour HH and minute mm in 24 hour format.\n\n"
-    sendTextMessage(userId, text);
+    sendTextMessage(userId, helpText);
   })
   
 }
@@ -160,7 +162,7 @@ function askUserForLanguage(event, user, introMessage) {
       sendTextMessage(senderID, "Are you sure that's a real language? 🤔\n\nPlease type the language you want to learn again.");
     } else {
       firebase.updateLanguage(senderID, userLanguage);
-      var text = "Great, you're all set to learn " + message.text + "!\n\n";
+      var text = "Great, you're all set to learn " + languages.reverseMap[userLanguage] + "!\n\n";
       text = text + "Send me a word in English and I will translate it for you in " + message.text + "."
       sendTextMessage(senderID, text)    
       firebase.setWasAsked(senderID, false);
@@ -247,10 +249,11 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
-  if(messageText.toLowerCase().replace(/\s+/, "").includes("/reminder")){
+  var messageTextLower = messageText.toLowerCase()
+  if(messageTextLower.replace(/\s+/, "").includes("/reminder")){
     parseAndSetQuizTime(senderID, messageText)
   } else {
-    switch (messageText.toLowerCase()) {
+    switch (messageTextLower) {
       case "/list":
         listWords(senderID);
         break;
@@ -320,11 +323,10 @@ function translateAndSendTextMessage(senderID, messageText, targetLanguage) {
     }
   );
 }
-
 function parseLanguage(inputtedLanguage) {
-  for (var i = 0; i < languages.length; i++){
-    if(inputtedLanguage.toLowerCase().includes(languages[i].name.toLowerCase())) {
-       return languages[i].language
+  for (var lang in languages.map){
+    if(inputtedLanguage.toLowerCase().includes(lang.toLowerCase()) | lang.toLowerCase().includes(inputtedLanguage.toLowerCase())) {
+       return languages.map[lang]
     }
   }
   
