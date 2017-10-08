@@ -27,10 +27,11 @@ function scheduleQuizJob(userId, hour, minute){
   if(userId in jobMap){
     jobMap[userId].cancel()
   }
-  send.callGetAPI(userId).then((facebookUser) => {
-    facebookUser = JSON.parse(facebookUser);
-    var name = facebookUser["first_name"]
-    var dueWords = quiz.getDueWords(userId).then((dueWords) => {
+  schedule.scheduleJob(rule,() => {
+    send.callGetAPI(userId).then((facebookUser) => {
+      facebookUser = JSON.parse(facebookUser);
+      var name = facebookUser["first_name"]
+      var dueWords = quiz.getDueWords(userId).then((dueWords) => {
       var text = "Hey " + name + ", remember what " + dueWords[0].translation + " means? Type /review to review this word";
       if (dueWords.length > 1) {
         text = text + " and " + String(dueWords.length-1) + " more"    
@@ -38,11 +39,8 @@ function scheduleQuizJob(userId, hour, minute){
       text = text + "! ✍️"
       console.log(text)
       send.sendTextMessage(userId, text);
-    })
+      })
+    });
   });
 
-  // jobMap[userId] = schedule.scheduleJob(rule,() => {
-  //   quiz.beginQuiz(userId);
-  //   console.log('schedulingJob');
-  // })
 }

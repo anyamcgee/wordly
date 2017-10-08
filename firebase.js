@@ -1,4 +1,4 @@
-const firebase = require('firebase')
+ const firebase = require('firebase')
 var exports = module.exports
 
   // Initialize Firebase
