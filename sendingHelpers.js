@@ -4,7 +4,7 @@ const rp = require('request-promise-native');
 //////////////////////////
 // Sending helpers
 //////////////////////////
-function sendTextMessage(recipientId, messageText) {
+function sendTextMessage(recipientId, messageText, callback) {
   var messageData = {
     recipient: {
       id: recipientId
@@ -14,11 +14,23 @@ function sendTextMessage(recipientId, messageText) {
     }
   };
 
-  callSendAPI(messageData);
+  return callSendAPI(messageData, callback);
 }
 
 
-function callSendAPI(messageData) {
+function chainMessages(userId, messageList){
+  const first =  messageList.pop();
+  var callback = ()=> { sendTextMessage(userId, first) };
+  
+  for(let message; message = messageList.pop();){ 
+    let newCallback = callback;
+    callback = ()=> { sendTextMessage(userId, message, newCallback) };
+  }
+  callback()
+}
+
+
+function callSendAPI(messageData, callback) {
   request({
     uri: 'https://graph.facebook.com/v2.6/me/messages',
     qs: { access_token: process.env.PAGE_ACCESS_TOKEN },
@@ -32,6 +44,9 @@ function callSendAPI(messageData) {
 
       console.log("Successfully sent generic message with id %s to recipient %s", 
         messageId, recipientId);
+      if(callback){
+        callback();
+      }
     } else {
       console.error("Unable to send message.");
       console.error(response);
@@ -60,5 +75,6 @@ function callGetAPI(userId) {
 module.exports = {
   callSendAPI: callSendAPI, 
   sendTextMessage: sendTextMessage,
-  callGetAPI: callGetAPI
+  callGetAPI: callGetAPI,
+  chainMessages: chainMessages
 }

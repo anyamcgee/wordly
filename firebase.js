@@ -26,7 +26,8 @@ exports.createUser = function createUser(userId, language) {
   console.log("hittin dat firebase")
   var ref = database.ref('users/' + userId);
   return ref.set({
-    beingAsked: false
+    beingAsked: false,
+    onboarding: true
   }).then(() => {
     return ref.once('value');
   }).then((snapshot) =>{
@@ -45,6 +46,11 @@ exports.clearLanguage = function clearLanguage(userId) {
 exports.setWasAsked = function setWasAsked(userId, val) {
   database.ref('users/' + userId + '/beingAsked').set(val);
 }
+
+exports.setOnboarding = function setOnboarding(userId, val) {
+  database.ref('users/' + userId + '/onboarding').set(val);
+}
+
 exports.setAskingTime = function setWasAsked(userId, val) {
   return database.ref('users/' + userId + '/beingAskedTime').set(val);
 }
