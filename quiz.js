@@ -65,6 +65,7 @@ exports.beginQuiz = function(userId) {
 
 exports.evaluateAnswer = function evaluateAnswer(userId, currentGuess, timeOfGuess, words){
   firebase.getCurrentQuizWord(userId).then(function(currentWord) {
+    let lastWord = words.length <= 1
     removeWordFromQuizList(userId, words)
     currentWord.time = timeOfGuess;
     var returnMessage = null;
@@ -78,9 +79,10 @@ exports.evaluateAnswer = function evaluateAnswer(userId, currentGuess, timeOfGue
       currentWord.level =  1;  
       returnMessage = "That is incorrect. The correct answer is \"" + currentWord.englishWord.toLowerCase() + "\".";
     }
-    if(!words.length > 1){
+    if(!lastWord){
       returnMessage +="\nHere is your next word:" 
     }
+    console.log(words.length)
     send.sendTextMessage(userId, returnMessage, () => {
       updateWord(userId, currentWord);
         quizNext(userId);      

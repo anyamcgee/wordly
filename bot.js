@@ -91,6 +91,14 @@ app.post('/webhook', function (req, res) {
   }
 });
 
+function deleteWord(userID, word){
+  firebase.setDeleting(userID, false).then(() => {
+    return firebase.deleteWord(userID, word)
+  }).then(() => {
+     send.sendTextMessage(userID, "Word deleted")
+  })
+}
+
 function receivedMessage(event) {
   var senderID = event.sender.id;
   
@@ -104,6 +112,8 @@ function receivedMessage(event) {
       checkAnswer(senderID, event, user.currentQuiz.currentWordList);
     } else if (user.beingAskedTime){
       parseAndSetQuizTime(senderID, event.message.nlp)
+    } else if (user.deleting){
+      deleteWord(senderID, event.message.text)
     } else {
       respondToMessage(event, user);
     }
@@ -117,8 +127,11 @@ var helpText = ""
     helpText += "/review: Start a quiz with the words which are due for review. \n"
     helpText +=  "/language: Switch the language you want to learn. \n"
     helpText += "/reminder Set your daily quiz reminder time\n"
-    helpText +=  "/delete: Delete all user data\n"
-    helpText +=  "/stop: Stop sending reminders \n\n"
+    helpText +=  "/delete: Delete one of your searched words\n"
+    helpText +=  "/deleteall: Delete all of your user data\n"
+    helpText +=  "/stop: Stop sending reminders \n"
+    helpText +=  "/help: Display this help message again \n\n"
+
 
 
 function help(userId) {
@@ -239,6 +252,13 @@ function askForQuizTime(senderID){
   })
 }
 
+function askForWordToDelete(senderID){
+  firebase.setDeleting(senderID, true).then(() => {
+    send.sendTextMessage(senderID, "What would would you like to delete? 🗑");
+  })
+}
+
+
 function parseAndSetQuizTime(userId, nlp){
   firebase.setAskingTime(userId, false).then(() => {
     if("datetime" in nlp.entities){
@@ -274,9 +294,9 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
-  var messageTextLower = messageText.toLowerCase().replace(/\s+/, "")
+  var command = messageText.toLowerCase().split(" ")[0]
 
-  switch (messageTextLower) {
+  switch (command) {
     case "/list":
       listWords(senderID);
       break;
@@ -298,9 +318,12 @@ function respondToMessage(event, user) {
       send.sendTextMessage(senderID, "Daily reminder cancelled 👋");
       timer.cancelQuiz(senderID)
       break;
-    case "/delete" :
+    case "/deleteall" :
       deleteUser(senderID)
       break;
+    case "/delete" :
+      askForWordToDelete(senderID)
+      break;  
     default:
       receivedWord(senderID, messageText, user.language, timeOfMessage);
       break;
