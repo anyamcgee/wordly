@@ -20,14 +20,22 @@ module.exports.scheduleQuiz = function scheduleQuiz(userId, hour, minute){
   })
 }
 
-function scheduleQuizJob(userId, hour, minute){
-  var rule = new schedule.RecurrenceRule();
-  rule.minute = minute;
-  rule.hour
+module.exports.cancelQuiz = function cancelQuiz(userId){
   if(userId in jobMap){
     jobMap[userId].cancel()
   }
-  schedule.scheduleJob(rule,() => {
+  firebase.clearQuizTime(userId)
+}
+
+function scheduleQuizJob(userId, hour, minute){
+  var rule = new schedule.RecurrenceRule();
+  rule.minute = minute;
+  rule.hour = hour;
+  if(userId in jobMap){
+    jobMap[userId].cancel()
+  }
+
+  jobMap[userId] = schedule.scheduleJob(rule,() => {
     send.callGetAPI(userId).then((facebookUser) => {
       facebookUser = JSON.parse(facebookUser);
       var name = facebookUser["first_name"]
