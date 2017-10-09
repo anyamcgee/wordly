@@ -269,6 +269,7 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
+
   var messageTextLower = messageText.toLowerCase().replace(/\s+/, "")
 
   switch (messageTextLower) {
