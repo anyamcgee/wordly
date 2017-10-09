@@ -34,7 +34,6 @@ function scheduleQuizJob(userId, hour, minute){
   if(userId in jobMap){
     jobMap[userId].cancel()
   }
-
   jobMap[userId] = schedule.scheduleJob(rule,() => {
     send.callGetAPI(userId).then((facebookUser) => {
       facebookUser = JSON.parse(facebookUser);

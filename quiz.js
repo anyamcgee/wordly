@@ -58,30 +58,34 @@ function quizNext(userId) {
 
 exports.beginQuiz = function(userId) {
   firebase.beginUserQuiz(userId);
-  send.sendTextMessage(userId, "Great, let's start the quiz! \n\n I'll send you some words, and you translate them to English");
-  findWords(userId); 
+  send.sendTextMessage(userId, "Great, let's start the quiz! \n\n I'll send you some words, and you translate them to English", () => {
+      findWords(userId);     
+  });
 };
 
-exports.evaluateAnswer = function evaluateAnswer(userId, currentGuess, timeOfGuess) {
+exports.evaluateAnswer = function evaluateAnswer(userId, currentGuess, timeOfGuess, words){
   firebase.getCurrentQuizWord(userId).then(function(currentWord) {
-    removeWordFromQuizList(userId, currentWord.englishWord)
+    removeWordFromQuizList(userId, words)
     currentWord.time = timeOfGuess;
     var returnMessage = null;
     if (currentWord.englishWord.toLowerCase() === currentGuess.text.toLowerCase()) {
       // TODO: If level is 5 we don't want to increase it any more, otherwise we do
       currentWord.level = currentWord.level + 1;
-      returnMessage = "Correct! Here is your next word.";
+      returnMessage = "Correct!";
     } 
     else {
       // Wrong guess, back to level 1 loser!!!
       currentWord.level =  1;  
-      returnMessage = "That is incorrect. The correct answer is " + currentWord.englishWord.toLowerCase() + ".";
+      returnMessage = "That is incorrect. The correct answer is \"" + currentWord.englishWord.toLowerCase() + "\".";
     }
-    send.sendTextMessage(userId, returnMessage);
-    updateWord(userId, currentWord);
-    removeWordFromQuizList(userId, currentWord).then(function() {
-      quizNext(userId);
+    if(!words.length > 1){
+      returnMessage +="\nHere is your next word:" 
+    }
+    send.sendTextMessage(userId, returnMessage, () => {
+      updateWord(userId, currentWord);
+        quizNext(userId);      
     });
+
   })
 }
 
@@ -89,11 +93,9 @@ function updateWord(senderID, wordEntry) {
   firebase.addWord(senderID, wordEntry.englishWord, wordEntry);
 }
 
-function removeWordFromQuizList(userId, currentWord) {
- return firebase.getCurrentQuizWords(userId).then(function(words) {
-   words = words.splice(1);
-   firebase.updateUserQuizItems(userId, words);
- });
+function removeWordFromQuizList(userId, words) {
+  words = words.splice(1);
+  firebase.updateUserQuizItems(userId, words);
 }
 
 // From StackOverflow https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array

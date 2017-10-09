@@ -12,6 +12,7 @@ const timer = require('./timer.js')
 const onboarding = require('./onboarding.js');
 const languages = require('./languages.js')
 const quiz = require('./quiz.js')
+const send = require('./sendingHelpers.js')
 var messengerButton = "<html><head><title>Facebook Messenger Bot</title></head><body><h1>Facebook Messenger Bot</h1>This is a bot based on Messenger Platform QuickStart. For more details, see their <a href=\"https://developers.facebook.com/docs/messenger-platform/guides/quick-start\">docs</a>.<script src=\"https://button.glitch.me/button.js\" data-style=\"glitch\"></script><div class=\"glitchButton\" style=\"position:fixed;top:20px;right:20px;\"></div></body></html>";
 var translate = require('@google-cloud/translate')(
   {
@@ -100,7 +101,7 @@ function receivedMessage(event) {
     } else if (!user.language) {
       askUserForLanguage(event, user)
     } else if (user.currentQuiz && user.currentQuiz.active) {
-      checkAnswer(senderID, event);
+      checkAnswer(senderID, event, user.currentQuiz.currentWordList);
     } else if (user.beingAskedTime){
       parseAndSetQuizTime(senderID, event.message.nlp)
     } else {
@@ -110,27 +111,24 @@ function receivedMessage(event) {
   });
 }
 var helpText = ""
-    helpText += "Supported commands: \n"
+    helpText += "Here are some supported commands: \n"
     helpText += "\n"
     helpText += "/list: Display a list all of the words you've searched so far. \n"
     helpText += "/review: Start a quiz with the words which are due for review. \n"
     helpText +=  "/language: Switch the language you want to learn. \n"
     helpText += "/reminder Set your daily quiz reminder time\n"
-    helpText +=  "/delete: Delete all my data\n"
+    helpText +=  "/delete: Delete all user data\n"
     helpText +=  "/stop: Stop sending reminders \n\n"
 
 
 function help(userId) {
-  firebase.getUserLanguage(userId).then ((userLanguage) => {
-    sendTextMessage(userId, helpText);
-  })
-  
+    send.sendTextMessage(userId, helpText);
 }
 
-function checkAnswer(userId, event) {
+function checkAnswer(userId, event, words){
   var guess = event.message;
   var timeOfGuess = event.timestamp;
-  quiz.evaluateAnswer(userId, guess, timeOfGuess);
+  quiz.evaluateAnswer(userId, guess, timeOfGuess, words)
 }
 
 function createNewUser(event, senderId) {
@@ -162,13 +160,19 @@ function askUserForLanguage(event, user, introMessage) {
     var userLanguage = parseLanguage(message.text)
   
     if (!userLanguage) {
-      sendTextMessage(senderID, "Are you sure that's a real language? 🤔\n\nPlease type the language you want to learn again.");
+      send.sendTextMessage(senderID, "Are you sure that's a real language? 🤔\n\nPlease type the language you want to learn again.");
     } else {
       firebase.updateLanguage(senderID, userLanguage);
       var text = "Great, you're all set to learn " + languages.reverseMap[userLanguage] + "!\n\n";
-      text = text + "Send me a word in English and I will translate it for you in " + message.text + "."
-      sendTextMessage(senderID, text)    
+      text = text + "Send me a word in English and I will translate it for you in " + languages.reverseMap[userLanguage] + "."
+      send.sendTextMessage(senderID, text, ()=>{
+        if(user.onboarding){
+          send.sendTextMessage(senderID, helpText);
+          firebase.setOnboarding(senderID, false);
+        }      
+      })    
       firebase.setWasAsked(senderID, false);
+  
     }
   } else {
     var text = ""
@@ -176,10 +180,11 @@ function askUserForLanguage(event, user, introMessage) {
       text = text + introMessage + "\n\n"
     }
     text = text + "What language would you like to learn?"
-    sendTextMessage(senderID, text);
+    send.sendTextMessage(senderID, text);
     firebase.setWasAsked(senderID, true);
   }
 }
+
 
 // English -> User_Lang translation
 function receivedWord(senderID, messageText, language, timeOfMessage) {
@@ -224,13 +229,13 @@ function listWords(user) {
     for (var key in words) {
       string = string + key + " : " + words[key].translation + "\n";
     }
-    sendTextMessage(user, string);
+    send.sendTextMessage(user, string);
   });
 }
 
 function askForQuizTime(senderID){
   firebase.setAskingTime(senderID, true).then(() => {
-    sendTextMessage(senderID, "What time would you like to be quizzed daily?");
+    send.sendTextMessage(senderID, "What time would you like to be quizzed daily?");
   })
 }
 
@@ -239,11 +244,11 @@ function parseAndSetQuizTime(userId, nlp){
     if("datetime" in nlp.entities){
       var time = moment.parseZone(nlp.entities.datetime[0].value)
       var output = "Ok I'll quiz you @" +  time.format("h:mm a");
-      sendTextMessage(userId, output)
+      send.sendTextMessage(userId, output)
       time  = time.local()
       timer.scheduleQuiz(userId, time.hour(), time.minute()) 
     } else {
-      sendTextMessage(userId, "Sorry, I didn't understand that time") 
+      send.sendTextMessage(userId, "Sorry, I didn't understand that time") 
     }    
   })
  
@@ -253,7 +258,7 @@ function deleteUser(userId){
   firebase.deleteUser(userId)
   firebase.deleteUserWords(userId)
   timer.cancelQuiz(userId)
-  sendTextMessage(userId, "User data deleted 🗑️");
+  send.sendTextMessage(userId, "User data deleted 🗑️");
 
 }
 
@@ -269,7 +274,6 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
-
   var messageTextLower = messageText.toLowerCase().replace(/\s+/, "")
 
   switch (messageTextLower) {
@@ -291,7 +295,7 @@ function respondToMessage(event, user) {
       askForQuizTime(senderID)
       break;
     case "/stop" :
-      sendTextMessage(senderID, "Daily reminder cancelled 👋");
+      send.sendTextMessage(senderID, "Daily reminder cancelled 👋");
       timer.cancelQuiz(senderID)
       break;
     case "/delete" :
@@ -317,24 +321,12 @@ function receivedPostback(event) {
 
   // When a postback is called, we'll send a message back to the sender to 
   // let them know it was successful
-  sendTextMessage(senderID, "Postback called");
+  send.sendTextMessage(senderID, "Postback called");
 }
 
 //////////////////////////
 // Sending helpers
 //////////////////////////
-function sendTextMessage(recipientId, messageText) {
-  var messageData = {
-    recipient: {
-      id: recipientId
-    },
-    message: {
-      text: messageText
-    }
-  };
-
-  return callSendAPI(messageData);
-}
 
 // TODO: Fix for cases like chat where it's a different word in different languages
 function translateAndSendTextMessage(senderID, messageText, targetLanguage) {
@@ -343,7 +335,7 @@ function translateAndSendTextMessage(senderID, messageText, targetLanguage) {
       // TODO: Hack to make the DB not break by taking out all the dots in the returned string. Should probably fix at some point
       translatedText = translatedText[0].split('.').join("");
       console.log("translateAndSendTextMessage: " + translatedText);
-      sendTextMessage(senderID, translatedText);
+      send.sendTextMessage(senderID, translatedText);
       return translatedText;
     })
     .catch((err) => {
@@ -371,75 +363,6 @@ function parseLanguageCode(inputtedLanguageCode) {
   
   return false;
 
-}
-
-function sendGenericMessage(recipientId) {
-  var messageData = {
-    recipient: {
-      id: recipientId
-    },
-    message: {
-      attachment: {
-        type: "template",
-        payload: {
-          template_type: "generic",
-          elements: [{
-            title: "rift",
-            subtitle: "Next-generation virtual reality",
-            item_url: "https://www.oculus.com/en-us/rift/",               
-            image_url: "http://messengerdemo.parseapp.com/img/rift.png",
-            buttons: [{
-              type: "web_url",
-              url: "https://www.oculus.com/en-us/rift/",
-              title: "Open Web URL"
-            }, {
-              type: "postback",
-              title: "Call Postback",
-              payload: "Payload for first bubble",
-            }],
-          }, {
-            title: "touch",
-            subtitle: "Your Hands, Now in VR",
-            item_url: "https://www.oculus.com/en-us/touch/",               
-            image_url: "http://messengerdemo.parseapp.com/img/touch.png",
-            buttons: [{
-              type: "web_url",
-              url: "https://www.oculus.com/en-us/touch/",
-              title: "Open Web URL"
-            }, {
-              type: "postback",
-              title: "Call Postback",
-              payload: "Payload for second bubble",
-            }]
-          }]
-        }
-      }
-    }
-  };  
-
-  callSendAPI(messageData);
-}
-
-function callSendAPI(messageData) {
-  request({
-    uri: 'https://graph.facebook.com/v2.6/me/messages',
-    qs: { access_token: process.env.PAGE_ACCESS_TOKEN },
-    method: 'POST',
-    json: messageData
-
-  }, function (error, response, body) {
-    if (!error && response.statusCode == 200) {
-      var recipientId = body.recipient_id;
-      var messageId = body.message_id;
-
-      console.log("Successfully sent generic message with id %s to recipient %s", 
-        messageId, recipientId);
-    } else {
-      console.error("Unable to send message.");
-      console.error(response);
-      console.error(error);
-    }
-  });  
 }
 
 // POST with promise 
