@@ -55,6 +55,11 @@ exports.setAskingTime = function setWasAsked(userId, val) {
   return database.ref('users/' + userId + '/beingAskedTime').set(val);
 }
 
+exports.setDeleting = function setDeleting(userId, val) {
+  return database.ref('users/' + userId + '/deleting').set(val);
+}
+
+
 exports.getUserLanguage = function getUserLanguage(userId) {
   return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
     return (snapshot.val() && snapshot.val().language) || false;
@@ -89,6 +94,10 @@ exports.deleteUser = function deleteUser(userId) {
   return firebase.database().ref('/users/' + userId ).remove()
 }
 
+exports.deleteWord = function deleteWord(userId, word) {
+  return firebase.database().ref('/words/' + userId+"/" + word).remove()
+}
+
 
 exports.deleteUserWords = function deleteUserWords(userId) {
   return firebase.database().ref('/words/' + userId ).remove()
@@ -101,7 +110,7 @@ exports.getUserWords = function getUserWords(userId) {
 }
 
 exports.beginUserQuiz = function beginUserQuiz(userId) {
-  database.ref('users/' + userId + '/currentQuiz/active').set(true);
+  return database.ref('users/' + userId + '/currentQuiz/active').set(true);
 }
 
 exports.endUserQuiz = function endUserQuiz(userId) {
