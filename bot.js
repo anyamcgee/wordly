@@ -6,7 +6,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const request = require('request');
 const path = require('path');
-var moment = require('moment-timezone');
+const moment = require('moment-timezone');
 const firebase = require('./firebase.js')
 const timer = require('./timer.js')
 const onboarding = require('./onboarding.js');
@@ -101,6 +101,8 @@ function receivedMessage(event) {
       askUserForLanguage(event, user)
     } else if (user.currentQuiz && user.currentQuiz.active) {
       checkAnswer(senderID, event);
+    } else if (user.beingAskedTime){
+      parseAndSetQuizTime(senderID, event.message.nlp)
     } else {
       respondToMessage(event, user);
     }
@@ -113,7 +115,8 @@ var helpText = ""
     helpText += "/list: Display a list all of the words you've searched so far. \n"
     helpText += "/review: Start a quiz with the words which are due for review. \n"
     helpText +=  "/language: Switch the language you want to learn. \n"
-    helpText += "/reminder HH:mm: Set your quiz reminder time to hour HH and minute mm in 24 hour format.\n"
+    helpText += "/reminder Set your daily quiz reminder time\n"
+    helpText +=  "/delete: Delete all my data\n"
     helpText +=  "/stop: Stop sending reminders \n\n"
 
 
@@ -225,16 +228,33 @@ function listWords(user) {
   });
 }
 
-function parseAndSetQuizTime(userId, timeString){
-   var n = timeString.split(" ");
-  var time = moment.tz(n[n.length - 1], "HH:mm", "America/Los_Angeles");
-  if (time.isValid()){
-      sendTextMessage(userId, "Your quiz reminder time has been set to " + time.hour()+":"+ time.minute()) + ".";
-      time = time.local();
+function askForQuizTime(senderID){
+  firebase.setAskingTime(senderID, true).then(() => {
+    sendTextMessage(senderID, "What time would you like to be quizzed daily?");
+  })
+}
+
+function parseAndSetQuizTime(userId, nlp){
+  firebase.setAskingTime(userId, false).then(() => {
+    if("datetime" in nlp.entities){
+      var time = moment.parseZone(nlp.entities.datetime[0].value)
+      var output = "Ok I'll quiz you @" +  time.format("h:mm a");
+      sendTextMessage(userId, output)
+      time  = time.local()
       timer.scheduleQuiz(userId, time.hour(), time.minute()) 
-  } else {
-      sendTextMessage(userId, "Not valid time format, use HH:mm") 
-  }
+    } else {
+      sendTextMessage(userId, "Sorry, I didn't understand that time") 
+    }    
+  })
+ 
+}
+
+function deleteUser(userId){
+  firebase.deleteUser(userId)
+  firebase.deleteUserWords(userId)
+  timer.cancelQuiz(userId)
+  sendTextMessage(userId, "User data deleted 🗑️");
+
 }
 
 function respondToMessage(event, user) {
@@ -249,30 +269,37 @@ function respondToMessage(event, user) {
   var messageId = message.mid;
 
   var messageText = message.text;
-  var messageTextLower = messageText.toLowerCase()
-  if(messageTextLower.replace(/\s+/, "").includes("/reminder")){
-    parseAndSetQuizTime(senderID, messageText)
-  } else {
-    switch (messageTextLower) {
-      case "/list":
-        listWords(senderID);
-        break;
-      case "/language":
-        firebase.clearLanguage(senderID).then(() => {
-          askUserForLanguage(event, user);
-        })
-        break;
-      case "/review":
-        quiz.beginQuiz(senderID);
-        break;
-      case "/help":
-        help(senderID);
-        break;
-      default:
-        receivedWord(senderID, messageText, user.language, timeOfMessage);
-        break;
-    }
-  }
+  var messageTextLower = messageText.toLowerCase().replace(/\s+/, "")
+
+  switch (messageTextLower) {
+    case "/list":
+      listWords(senderID);
+      break;
+    case "/language":
+      firebase.clearLanguage(senderID).then(() => {
+        askUserForLanguage(event, user);
+      })
+      break;  
+    case "/review":
+      quiz.beginQuiz(senderID);
+      break;
+    case "/help":
+      help(senderID);
+      break;
+    case "/reminder" :
+      askForQuizTime(senderID)
+      break;
+    case "/stop" :
+      sendTextMessage(senderID, "Daily reminder cancelled 👋");
+      timer.cancelQuiz(senderID)
+      break;
+    case "/delete" :
+      deleteUser(senderID)
+      break;
+    default:
+      receivedWord(senderID, messageText, user.language, timeOfMessage);
+      break;
+  }  
 }
 
 function receivedPostback(event) {

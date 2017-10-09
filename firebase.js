@@ -15,11 +15,11 @@ firebase.initializeApp(config);
 var database = firebase.database();
 
 exports.addWord = function addMessage(userId, word, entry){
-   var newItem = database.ref('users/' + userId + "/words/" + word).set(entry);
+   var newItem = database.ref('words/' + userId + "/" + word).set(entry);
 }
 
 exports.addTranslationForWord = function addTranslationForWord(userId, translation, word) {
-  database.ref('users/' + userId + "/words/" + word + "/translation").set(translation);
+  database.ref('words/' + userId + "/" + word + "/translation").set(translation);
 };
 
 exports.createUser = function createUser(userId, language) {
@@ -45,9 +45,11 @@ exports.clearLanguage = function clearLanguage(userId) {
 exports.setWasAsked = function setWasAsked(userId, val) {
   database.ref('users/' + userId + '/beingAsked').set(val);
 }
+exports.setAskingTime = function setWasAsked(userId, val) {
+  return database.ref('users/' + userId + '/beingAskedTime').set(val);
+}
 
 exports.getUserLanguage = function getUserLanguage(userId) {
-  console.log("hittin dat firebase")
   return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
     return (snapshot.val() && snapshot.val().language) || false;
   });
@@ -58,6 +60,10 @@ exports.setQuizTime = function setQuizTime(userId, hour, minute) {
     hour: hour,
     minute: minute 
   });
+}
+
+exports.clearQuizTime = function clearQuizTime(userId) {
+  return database.ref('jobs/' + userId).remove()
 }
 
 exports.getAllJobs = function getAllJobs() {
@@ -73,9 +79,18 @@ exports.getUser = function getUser(userId) {
   });
 }
 
+exports.deleteUser = function deleteUser(userId) {
+  return firebase.database().ref('/users/' + userId ).remove()
+}
+
+
+exports.deleteUserWords = function deleteUserWords(userId) {
+  return firebase.database().ref('/words/' + userId ).remove()
+}
+
 exports.getUserWords = function getUserWords(userId) {
-  return firebase.database().ref('/users/' + userId ).once('value').then(function(snapshot) {
-    return (snapshot.val() && snapshot.val().words) || false;
+  return firebase.database().ref('/words/' + userId ).once('value').then(function(snapshot) {
+    return (snapshot.val() && snapshot.val()) || false;
   });
 }
 
@@ -88,7 +103,7 @@ exports.endUserQuiz = function endUserQuiz(userId) {
 }
 
 exports.updateUserWord = function updateUserWord(userId, word, updatedWord) {
-  var newItem = database.ref('users/' + userId + "/words/" + word).set(updatedWord);
+  var newItem = database.ref('words/' + userId + "/" + word).set(updatedWord);
 }
 
 exports.updateUserQuizItems = function updateUserQuizItems(userId, quizItems) {
